@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <base target="_top"> <!-- GASウェブアプリの必須設定 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONE OK ROCK 魂の叫び場</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ラフな雰囲気を出すためのフォントとデザイン */
+        @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Kosugi Maru', 'Inter', sans-serif;
+            background-color: #1f2937; /* 暗い背景色 */
+            color: #e5e7eb; /* 明るいテキスト色 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #111827; /* さらに暗い背景色 */
+            border-radius: 1.5rem; /* 角をさらに丸く */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #059669; /* 緑色のヘッダー */
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .form-section {
+            padding: 1.5rem;
+            border-bottom: 1px solid #374151; /* 暗いボーダー色 */
+        }
+        .message-list {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column-reverse; /* 最新のメッセージが一番上に表示されるようにする */
+            gap: 1rem;
+        }
+        .message-card {
+            background-color: #1f2937; /* メッセージカードの背景 */
+            border-radius: 1rem; /* 角をさらに丸く */
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+        .message-card:hover {
+            transform: translateY(-2px);
+        }
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #10b981; /* 明るい緑色の名前 */
+        }
+        .message-text {
+            color: #d1d5db; /* 明るい灰色のテキスト */
+        }
+        .timestamp {
+            font-size: 0.75rem;
+            color: #6b7280; /* 灰色のタイムスタンプ */
+        }
+        .error-message {
+            color: #f87171; /* 赤色のエラーメッセージ */
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        .btn-submit {
+            background-color: #059669; /* 緑色のボタン */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; /* ボタンの角も丸く */
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        .btn-submit:hover {
+            background-color: #047857; /* ホバーでさらに濃い緑色に */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        ONE OK ROCK 魂の叫び場
+    </div>
+    <div class="form-section">
+        <!-- ロード中のインジケータ -->
+        <div id="loading-indicator" class="text-center text-green-400 mb-4 hidden">
+            <p>魂のメッセージをロード中...</p>
+        </div>
+        
+        <form id="message-form" class="space-y-4">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-200">好きな曲</label>
+                <input type="text" id="name" name="name" placeholder="あなたのフェイバリット・ソング" class="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-white shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
+            </div>
+            <div>
+                <label for="message" class="block text-sm font-medium text-gray-200">魂の叫び</label>
+                <textarea id="message" name="message" rows="4" placeholder="ONE OK ROCKへの熱いシャウトを叩きつけろ！" required class="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-white shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"></textarea>
+                <div id="error-message" class="error-message hidden">メッセージが空っぽだぜ！魂を込めて書き込め！</div>
+                <div id="copyright-error" class="error-message hidden">それはロックじゃねえ！著作権と肖像権を尊重しろ！</div>
+                <div id="api-error" class="error-message hidden">サーバーとの接続が切れた！もう一度試してくれ。</div>
+            </div>
+            <button type="submit" id="submit-button" class="btn-submit">ブチ込む！</button>
+        </form>
+    </div>
+    <div id="message-list-header" class="px-6 pt-4 text-sm font-semibold text-green-400">
+        <!-- メッセージ総数がここに表示されます -->
+    </div>
+    <div id="message-list" class="message-list">
+        <!-- メッセージがここに動的に追加されます -->
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message');
+        const nameInput = document.getElementById('name');
+        const messageList = document.getElementById('message-list');
+        const submitButton = document.getElementById('submit-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const messageListHeader = document.getElementById('message-list-header');
+
+        const errorMessages = {
+            empty: document.getElementById('error-message'),
+            copyright: document.getElementById('copyright-error'),
+            api: document.getElementById('api-error')
+        };
+        
+        // エラーメッセージをリセットするヘルパー関数
+        const resetErrors = () => {
+            Object.values(errorMessages).forEach(el => el.classList.add('hidden'));
+        };
+
+        // メッセージカードを作成する関数
+        const createMessageCard = (message) => {
+            const card = document.createElement('div');
+            card.className = 'message-card';
+            
+            // スプレッドシートから取得した日付オブジェクトまたは文字列を整形
+            let displayTimestamp = '';
+            if (message.timestamp instanceof Date) {
+                 displayTimestamp = message.timestamp.toLocaleString();
+            } else if (typeof message.timestamp === 'string') {
+                 // ロード時にタイムスタンプが文字列として来る場合
+                 displayTimestamp = new Date(message.timestamp).toLocaleString();
+            } else {
+                 displayTimestamp = new Date().toLocaleString(); // フォールバック
+            }
+
+            card.innerHTML = `
+                <div class="message-header">
+                    <span>${message.name || '名無し'}</span>
+                    <span class="timestamp">${displayTimestamp}</span>
+                </div>
+                <p class="message-text">${message.text}</p>
+            `;
+            return card;
+        };
+
+        // メッセージを一覧に表示する関数（GASのSuccess Handler）
+        const displayMessages = (messagesJson) => {
+            loadingIndicator.classList.add('hidden');
+            let messages;
+            try {
+                messages = JSON.parse(messagesJson);
+            } catch (e) {
+                console.error("Failed to parse messages JSON:", e);
+                messages = [];
+            }
+            
+            messageList.innerHTML = '';
+            
+            // 最新順に表示するため、元のメッセージ配列を逆順にする (シートのデータは投稿順のため)
+            messages.reverse().forEach(msg => {
+                const messageCard = createMessageCard(msg);
+                messageList.appendChild(messageCard);
+            });
+
+            messageListHeader.textContent = `全投稿数: ${messages.length} 魂のシャウト`;
+        };
+        
+        // 投稿完了時に実行される関数（GASのSuccess Handler）
+        const onMessagePosted = (postedMessageJson) => {
+            submitButton.disabled = false;
+            submitButton.textContent = 'ブチ込む！';
+
+            if (!postedMessageJson) {
+                errorMessages.api.classList.remove('hidden');
+                return;
+            }
+
+            let postedMessage;
+            try {
+                postedMessage = JSON.parse(postedMessageJson);
+            } catch (e) {
+                console.error("Failed to parse posted message JSON:", e);
+                errorMessages.api.classList.remove('hidden');
+                return;
+            }
+
+            // 新しいメッセージをリストの先頭に追加
+            const messageCard = createMessageCard(postedMessage);
+            messageList.prepend(messageCard);
+
+            // メッセージ総数を更新するために再ロード（または単にカウントをインクリメント）
+            // シンプルな更新のため、今回はカウントを再ロード
+            google.script.run.withSuccessHandler(displayMessages).getMessages(); 
+            
+            // フォームをリセット
+            messageInput.value = '';
+        };
+
+        // 投稿失敗時に実行される関数（GASのFailure Handler）
+        const onPostFailure = (error) => {
+            submitButton.disabled = false;
+            submitButton.textContent = 'ブチ込む！';
+            console.error("GAS Post Error:", error);
+            errorMessages.api.classList.remove('hidden');
+            alert("サーバー通信エラーが発生したぜ..."); // GASではalertは許可されています
+        };
+
+        // 投稿内容に著作権や肖像権に違反する可能性のあるキーワードが含まれていないかチェック
+        const checkCopyrightViolation = (text) => {
+            const forbiddenWords = [
+                "違法", "ダウンロード", "無断転載", "著作権侵害",
+                "海賊版", "不正コピー", "流出画像", "写真転載"
+            ];
+            const lowerText = text.toLowerCase();
+            return forbiddenWords.some(word => lowerText.includes(word));
+        };
+
+        // フォーム送信時の処理
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            resetErrors();
+
+            const name = nameInput.value.trim() || '名無し';
+            const text = messageInput.value.trim();
+
+            if (text === '') {
+                errorMessages.empty.classList.remove('hidden');
+                return;
+            }
+            
+            if (checkCopyrightViolation(text)) {
+                errorMessages.copyright.classList.remove('hidden');
+                return;
+            }
+
+            const newMessage = {
+                name: name, // 好きな曲
+                text: text  // 魂の叫び
+            };
+
+            // 投稿ボタンを無効化し、ロード中表示
+            submitButton.disabled = true;
+            submitButton.textContent = 'ブチ込み中...';
+            
+            // GASサーバーサイド関数を呼び出し、スプレッドシートに保存
+            google.script.run
+                .withSuccessHandler(onMessagePosted)
+                .withFailureHandler(onPostFailure)
+                .postMessage(newMessage);
+        });
+
+        // ページロード時の初期メッセージ読み込み
+        const loadInitialMessages = () => {
+            loadingIndicator.classList.remove('hidden');
+            google.script.run
+                .withSuccessHandler(displayMessages)
+                .withFailureHandler(onPostFailure)
+                .getMessages();
+        };
+
+        loadInitialMessages();
+    });
+</script>
+</body>
+</html>
