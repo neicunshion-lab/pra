@@ -1,292 +1,1962 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <base target="_top"> <!-- GASウェブアプリの必須設定 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ONE OK ROCK 魂の叫び場</title>
+    <title>ONE OK ROCK ファン掲示板</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* ラフな雰囲気を出すためのフォントとデザイン */
-        @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Inter:wght@400;500;600;700&display=swap');
+        /* テーマカラー用のCSS変数を定義（JavaScriptで動的に上書きされます） */
+        :root {
+            --color-primary: #FF5050; /* デフォルト: Ambitions */
+            --color-secondary: #1A2035;
+            --color-background: #f7f7f7;
+        }
+
+        /* カスタムスタイル */
         body {
-            font-family: 'Kosugi Maru', 'Inter', sans-serif;
-            background-color: #1f2937; /* 暗い背景色 */
-            color: #e5e7eb; /* 明るいテキスト色 */
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-background); /* テーマ背景色を適用 */
+            transition: background-color 0.5s ease;
+        }
+        
+        .scrollable-content {
+            max-height: 70vh; /* 画面の高さに応じて調整 */
+            overflow-y: auto;
+        }
+        
+        /* スクロールバーのスタイルをカスタマイズ（任意） */
+        .scrollable-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-content::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 4px;
+        }
+
+        /* カスタムカラーを使ったTailwindのクラスを明示的に定義（CDN使用のため任意の値を使用） */
+        .text-primary { color: var(--color-primary); }
+        .bg-primary { background-color: var(--color-primary); }
+        .hover\:bg-secondary:hover { background-color: var(--color-secondary); }
+        .focus\:ring-primary:focus { --tw-ring-color: var(--color-primary); }
+        .focus\:border-primary:focus { border-color: var(--color-primary); }
+
+        /* チャットボット専用スタイル */
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 2rem;
+            flex-direction: column-reverse; /* 最新メッセージが下に来るように */
         }
-        .container {
-            width: 100%;
-            max-width: 800px;
-            background-color: #111827; /* さらに暗い背景色 */
-            border-radius: 1.5rem; /* 角をさらに丸く */
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
+        .message-bubble {
+            max-width: 85%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            word-wrap: break-word;
         }
-        .header {
-            background-color: #059669; /* 緑色のヘッダー */
+        .user-message {
+            align-self: flex-end;
+            background-color: var(--color-primary);
             color: white;
-            padding: 2rem;
-            text-align: center;
-            font-size: 2rem;
-            font-weight: 700;
+            border-bottom-right-radius: 4px;
         }
-        .form-section {
-            padding: 1.5rem;
-            border-bottom: 1px solid #374151; /* 暗いボーダー色 */
+        .ai-message {
+            align-self: flex-start;
+            background-color: #E5E7EB;
+            color: #1F2937;
+            border-bottom-left-radius: 4px;
         }
-        .message-list {
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column-reverse; /* 最新のメッセージが一番上に表示されるようにする */
-            gap: 1rem;
-        }
-        .message-card {
-            background-color: #1f2937; /* メッセージカードの背景 */
-            border-radius: 1rem; /* 角をさらに丸く */
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s;
-        }
-        .message-card:hover {
-            transform: translateY(-2px);
-        }
-        .message-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #10b981; /* 明るい緑色の名前 */
-        }
-        .message-text {
-            color: #d1d5db; /* 明るい灰色のテキスト */
-        }
-        .timestamp {
-            font-size: 0.75rem;
-            color: #6b7280; /* 灰色のタイムスタンプ */
-        }
-        .error-message {
-            color: #f87171; /* 赤色のエラーメッセージ */
-            font-size: 0.875rem;
-            margin-top: 0.5rem;
-        }
-        .btn-submit {
-            background-color: #059669; /* 緑色のボタン */
+        /* クイズ選択肢のホバー効果 */
+        .quiz-option:hover:not(:disabled) {
+            background-color: var(--color-primary);
             color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem; /* ボタンの角も丸く */
-            font-weight: 600;
-            transition: background-color 0.2s;
-        }
-        .btn-submit:hover {
-            background-color: #047857; /* ホバーでさらに濃い緑色に */
+            opacity: 0.9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
-<body>
+<body class="p-4 md:p-8">
 
-<div class="container">
-    <div class="header">
-        ONE OK ROCK 魂の叫び場
-    </div>
-    <div class="form-section">
-        <!-- ロード中のインジケータ -->
-        <div id="loading-indicator" class="text-center text-green-400 mb-4 hidden">
-            <p>魂のメッセージをロード中...</p>
+    <!-- グローバルなメッセージ表示エリア -->
+    <div id="message-area" class="fixed top-4 right-4 z-50"></div>
+
+    <!-- 利用規約モーダル -->
+    <div id="terms-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">利用規約</h2>
+            <div class="scrollable-content mb-6 p-2 border rounded-lg bg-gray-50">
+                <p class="text-sm text-gray-600 space-y-2">
+                    <strong>第1条 (目的)</strong>
+                    <br>本掲示板は、ONE OK ROCKのファン同士が交流し、情報交換を行うためのコミュニティです。
+                    <br><br><strong>第2条 (禁止事項)</strong>
+                    <br>以下の行為を厳禁します。
+                    <ul class="list-disc list-inside ml-4 mt-2">
+                        <li>他者への誹謗中傷、差別的な発言、ハラスメント行為。</li>
+                        <li>著作権、肖像権などの知的財産権を侵害する投稿。</li>
+                        <li>公序良俗に反する内容、または違法行為を助長する内容の投稿。</li>
+                        <li>商業目的の宣伝、勧誘行為。</li>
+                        <li>個人情報の無断公開。</li>
+                    </ul>
+                    <br><strong>第3条 (免責事項)</strong>
+                    <br>投稿内容は投稿者個人の意見であり、本サービスの管理者及び開発者はその内容について一切の責任を負いません。
+                    <br><br><strong>第4条 (アカウントとユーザーID)</strong>
+                    <br>本サービスでは、匿名または一時的な認証に基づきユーザーIDが割り当てられます。ユーザーIDは他のユーザーに公開されます。
+                    <br><br><strong>第5条 (投稿の削除)</strong>
+                    <br>管理者は、本規約に違反する投稿、またはコミュニティの秩序を乱すと判断した投稿を、予告なく削除する権利を有します。
+                </p>
+            </div>
+            <!-- テーマカラーを適用 -->
+            <button onclick="agreeToTerms()" class="w-full bg-primary hover:bg-secondary text-white font-bold py-3 px-4 rounded-lg transition duration-150 shadow-md hover:shadow-lg">
+                規約に同意して掲示板を開く
+            </button>
         </div>
-        
-        <form id="message-form" class="space-y-4">
-            <div>
-                <label for="name" class="block text-sm font-medium text-gray-200">好きな曲</label>
-                <input type="text" id="name" name="name" placeholder="あなたのフェイバリット・ソング" class="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-white shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm">
-            </div>
-            <div>
-                <label for="message" class="block text-sm font-medium text-gray-200">魂の叫び</label>
-                <textarea id="message" name="message" rows="4" placeholder="ONE OK ROCKへの熱いシャウトを叩きつけろ！" required class="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-white shadow-sm focus:border-green-500 focus:ring-green-500 sm:text-sm"></textarea>
-                <div id="error-message" class="error-message hidden">メッセージが空っぽだぜ！魂を込めて書き込め！</div>
-                <div id="copyright-error" class="error-message hidden">それはロックじゃねえ！著作権と肖像権を尊重しろ！</div>
-                <div id="api-error" class="error-message hidden">サーバーとの接続が切れた！もう一度試してくれ。</div>
-            </div>
-            <button type="submit" id="submit-button" class="btn-submit">ブチ込む！</button>
-        </form>
     </div>
-    <div id="message-list-header" class="px-6 pt-4 text-sm font-semibold text-green-400">
-        <!-- メッセージ総数がここに表示されます -->
-    </div>
-    <div id="message-list" class="message-list">
-        <!-- メッセージがここに動的に追加されます -->
-    </div>
-</div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const messageForm = document.getElementById('message-form');
-        const messageInput = document.getElementById('message');
-        const nameInput = document.getElementById('name');
-        const messageList = document.getElementById('message-list');
-        const submitButton = document.getElementById('submit-button');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const messageListHeader = document.getElementById('message-list-header');
-
-        const errorMessages = {
-            empty: document.getElementById('error-message'),
-            copyright: document.getElementById('copyright-error'),
-            api: document.getElementById('api-error')
-        };
-        
-        // エラーメッセージをリセットするヘルパー関数
-        const resetErrors = () => {
-            Object.values(errorMessages).forEach(el => el.classList.add('hidden'));
-        };
-
-        // メッセージカードを作成する関数
-        const createMessageCard = (message) => {
-            const card = document.createElement('div');
-            card.className = 'message-card';
-            
-            // スプレッドシートから取得した日付オブジェクトまたは文字列を整形
-            let displayTimestamp = '';
-            if (message.timestamp instanceof Date) {
-                 displayTimestamp = message.timestamp.toLocaleString();
-            } else if (typeof message.timestamp === 'string') {
-                 // ロード時にタイムスタンプが文字列として来る場合
-                 displayTimestamp = new Date(message.timestamp).toLocaleString();
-            } else {
-                 displayTimestamp = new Date().toLocaleString(); // フォールバック
-            }
-
-            card.innerHTML = `
-                <div class="message-header">
-                    <span>${message.name || '名無し'}</span>
-                    <span class="timestamp">${displayTimestamp}</span>
+    <!-- 投稿編集モーダル -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2">投稿を編集</h2>
+            <form id="edit-form">
+                <input type="hidden" id="edit-post-id">
+                <input type="text" id="edit-title" placeholder="タイトル" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" required maxlength="100">
+                <textarea id="edit-content" rows="6" placeholder="内容" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none" required maxlength="2000"></textarea>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideEditModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150">キャンセル</button>
+                    <!-- テーマカラーを適用 -->
+                    <button type="submit" class="px-4 py-2 bg-primary hover:bg-secondary text-white rounded-lg transition duration-150">
+                        保存
+                    </button>
                 </div>
-                <p class="message-text">${message.text}</p>
-            `;
-            return card;
-        };
+            </form>
+        </div>
+    </div>
+    
+    <!-- 削除確認モーダル -->
+    <div id="delete-confirm-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">投稿の削除確認</h2>
+            <p class="text-gray-600 mb-6">本当にこの投稿を削除しますか？一度削除すると元に戻せません。</p>
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="hideDeleteConfirmModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150">キャンセル</button>
+                <button type="button" id="confirm-delete-button" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition duration-150">
+                    削除する
+                </button>
+            </div>
+        </div>
+    </div>
 
-        // メッセージを一覧に表示する関数（GASのSuccess Handler）
-        const displayMessages = (messagesJson) => {
-            loadingIndicator.classList.add('hidden');
-            let messages;
-            try {
-                messages = JSON.parse(messagesJson);
-            } catch (e) {
-                console.error("Failed to parse messages JSON:", e);
-                messages = [];
-            }
-            
-            messageList.innerHTML = '';
-            
-            // 最新順に表示するため、元のメッセージ配列を逆順にする (シートのデータは投稿順のため)
-            messages.reverse().forEach(msg => {
-                const messageCard = createMessageCard(msg);
-                messageList.appendChild(messageCard);
-            });
+    <!-- ニックネーム設定モーダル -->
+    <div id="nickname-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">ニックネームを設定</h2>
+            <form id="nickname-form">
+                <input type="text" id="nickname-input" placeholder="3文字以上15文字以下のニックネーム" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" required minlength="3" maxlength="15">
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="hideNicknameModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150">キャンセル</button>
+                    <button type="submit" class="px-4 py-2 bg-primary hover:bg-secondary text-white rounded-lg transition duration-150">
+                        設定を保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-            messageListHeader.textContent = `全投稿数: ${messages.length} 魂のシャウト`;
+
+    <!-- メインコンテンツ（同意後に表示） -->
+    <main id="main-content" class="hidden max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <!-- テーマカラーを適用 -->
+            <h1 class="text-4xl font-extrabold text-primary tracking-wider">ONE OK ROCK 🎸 FAN BOARD</h1>
+            <p class="text-gray-600 mt-1">あなたのOORer愛を自由に語りましょう！</p>
+            
+            <div id="user-info-area" class="text-xs text-gray-500 mt-2 p-1 bg-gray-100 rounded-lg inline-block flex items-center justify-center space-x-2">
+                <span id="user-info">ID: (読み込み中)</span>
+                <button onclick="showNicknameModal()" class="text-blue-500 hover:text-blue-700 font-medium py-1 px-2 rounded-lg transition duration-150 border border-blue-200">
+                    ニックネーム設定
+                </button>
+            </div>
+            
+            <!-- ユーザー投稿絞り込み解除ボタン -->
+            <button id="clear-user-filter-button" onclick="clearUserFilter()" class="hidden text-sm mt-3 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-150 font-bold">
+                ユーザー投稿一覧を解除
+            </button>
+        </header>
+
+        <!-- ライブ情報表示欄 -->
+        <section class="mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">最新ライブ情報 (公式サイト)</h2>
+            <div id="live-info-container" class="bg-white p-6 rounded-xl shadow-lg">
+                <p class="text-center text-gray-500">公式サイトへのリンクを読み込み中...</p>
+            </div>
+        </section>
+        
+        <!-- AIチャットボット & クイズセクション -->
+        <section class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">🎤 OOR AIチャット & パーティクイズ (2-4人)</h2>
+            
+            <!-- クイズエリア -->
+            <div id="quiz-area" class="mb-6 border border-gray-300 rounded-lg p-4 bg-gray-50">
+                <h3 class="text-lg font-bold mb-3 text-primary">ONE OK ROCK クイズ大会！</h3>
+                
+                <!-- ★追加: ルームID管理UI ★ -->
+                <div class="mb-4 p-3 bg-white rounded-lg border flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                    <label for="room-id-input" class="text-sm font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">ルームID:</label>
+                    <input type="text" id="room-id-input" value="one_ok_rock_quiz" placeholder="新しいルームIDを入力" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-primary focus:border-primary" maxlength="20">
+                    <button onclick="changeQuizRoom()" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold py-2 px-4 rounded-lg flex-shrink-0 transition duration-150">
+                        切替/作成
+                    </button>
+                </div>
+                <!-- ★追加ここまで ★ -->
+                
+                <!-- プレイヤースロット -->
+                <p class="text-sm font-semibold mb-2 text-gray-700">参加者 (<span id="player-count">0</span>/4):</p>
+                <div id="player-slots" class="flex flex-wrap gap-3 mb-4 p-2 bg-white rounded-lg border">
+                    <!-- プレイヤースロットがここに表示される -->
+                </div>
+
+                <div id="quiz-status-message" class="text-center text-gray-600 mb-4 font-medium">
+                    クイズを開始するには2人以上の参加が必要です。（最大4人）
+                </div>
+
+                <div id="quiz-question-container" class="hidden">
+                    <p class="text-sm font-semibold mb-2 text-gray-700">現在の問題:</p>
+                    <div id="current-question" class="text-xl font-bold mb-4 p-3 bg-white border rounded-lg"></div>
+                    <div id="quiz-options" class="space-y-2">
+                        <!-- 選択肢がここに表示される -->
+                    </div>
+                </div>
+                
+                <!-- スコアボード -->
+                <div id="quiz-scoreboard" class="mt-6 pt-4 border-t border-gray-200">
+                    <p class="text-sm font-semibold mb-2 text-gray-700">スコアボード:</p>
+                    <div id="scoreboard-list" class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600">
+                        <!-- 参加者スコアがここに表示される -->
+                        <p class="text-xs text-gray-400">クイズ開始後にスコアが表示されます。</p>
+                    </div>
+                </div>
+
+                <div id="quiz-controls" class="mt-6 flex justify-center">
+                    <button onclick="startNewQuiz()" id="start-quiz-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition duration-150 shadow-md" disabled>
+                        クイズを開始 (2人から)
+                    </button>
+                    <button onclick="requestNextQuestion()" id="next-question-button" class="hidden bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition duration-150 shadow-md">
+                        次の問題へ
+                    </button>
+                </div>
+
+                <div id="quiz-loading-message" class="hidden mt-3 text-center text-sm text-primary font-medium">
+                    AIが問題を作成中...🎸 しばらくお待ちください。
+                </div>
+            </div>
+
+            <!-- AIチャットエリア -->
+            <p class="text-sm text-gray-600 mb-4 border-t pt-4">チャットボットに質問する:</p>
+            
+            <div class="chat-container mb-4 border border-gray-300 rounded-lg p-3 bg-gray-50 flex flex-col-reverse" id="ai-chat-history">
+                <!-- Chat messages will be appended here -->
+                <div class="ai-message text-xs font-medium self-start">
+                    こんにちは！ONE OK ROCKのことは何でも聞いてくださいね。準備はいいですか？
+                </div>
+            </div>
+
+            <form id="ai-chat-form" class="flex">
+                <input type="text" id="ai-chat-input" placeholder="例: Takaのお気に入りの曲は？" class="w-full p-3 border border-gray-300 rounded-l-lg text-sm focus:ring-primary focus:border-primary" required>
+                <!-- テーマカラーを適用 -->
+                <button type="submit" id="ai-chat-button" class="bg-primary hover:bg-secondary text-white font-bold py-3 px-6 rounded-r-lg transition duration-150 shadow-md flex-shrink-0">
+                    質問
+                </button>
+            </form>
+            <div id="ai-loading-message" class="hidden mt-2 text-sm text-primary font-medium">
+                AIが回答を考え中です...🎸
+            </div>
+            
+            <!-- AI利用条件メッセージ -->
+            <div id="ai-usage-condition" class="mt-4 text-center text-sm text-gray-600">
+                AI機能を利用するには、掲示板に**3回以上**投稿する必要があります。現在の投稿数: <span id="user-post-count" class="font-bold text-primary">0</span>回
+            </div>
+        </section>
+
+        <!-- 新規投稿フォーム -->
+        <section class="bg-white p-6 rounded-xl shadow-lg mb-8">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">新規投稿</h2>
+            <form id="post-form">
+                <!-- タイトル入力欄 -->
+                <input type="text" id="post-title" placeholder="タイトル (例: 好きな曲は？)" class="w-full p-3 mb-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" required maxlength="100">
+                
+                <!-- 予測変換表示エリア -->
+                <div id="title-suggestions" class="relative z-10 mb-3"></div>
+
+                <textarea id="post-content" rows="4" placeholder="あなたの熱い想いを書き込んでください (2000文字まで)" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none" required maxlength="2000"></textarea>
+                <!-- テーマカラーを適用 -->
+                <button type="submit" class="w-full bg-primary hover:bg-secondary text-white font-bold py-3 rounded-lg transition duration-150 shadow-md">
+                    投稿する
+                </button>
+            </form>
+        </section>
+
+        <!-- 投稿表示欄 -->
+        <section>
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">みんなの投稿</h2>
+            
+            <!-- ソートと検索・フィルタリングUIの追加 -->
+            <div class="mb-6 space-y-4">
+                <div class="flex items-center space-x-3">
+                    <label for="sort-criteria" class="text-gray-600 font-medium whitespace-nowrap">ソート基準:</label>
+                    <select id="sort-criteria" onchange="sortAndRenderPosts()" class="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-white text-gray-700">
+                        <option value="latest">最新順</option>
+                        <option value="popular">人気順 (いいね順)</option>
+                    </select>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <input type="text" id="filter-input" placeholder="タイトルでキーワード検索..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" maxlength="100">
+                    <button id="filter-button" onclick="handleFilter()" class="flex-shrink-0 bg-primary hover:bg-secondary text-white font-bold py-3 px-6 rounded-lg transition duration-150 shadow-md">
+                        絞り込む
+                    </button>
+                </div>
+            </div>
+
+            <div id="posts-container" class="space-y-6">
+                <!-- 投稿がここにリアルタイムで表示されます -->
+                <p id="loading-message" class="text-center text-gray-500">投稿データを読み込み中...</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, orderBy, limit, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, increment, setLogLevel, deleteDoc, arrayUnion, getDoc, setDoc, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase設定のグローバル変数を使用
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false; // 認証完了フラグ
+        let allPosts = []; // すべての投稿データを保持する配列
+        let postIdToDelete = null; // 削除対象の投稿IDを一時的に保持
+        let currentNickname = "名無しOORer"; // ニックネームの初期値
+        let userFilterId = null; // 投稿絞り込み中のユーザーID
+        let userPostCount = 0; // ユーザーの投稿数
+
+        // クイズ状態管理用変数
+        const QUIZ_COLLECTION_PATH = `/artifacts/${appId}/public/data/quiz_sessions`; 
+        let currentQuizId = 'one_ok_rock_quiz'; // 初期ルームID
+        let quizListener = null; 
+        let quizState = null; 
+        const MAX_PLAYERS = 4;
+        const MIN_PLAYERS_TO_START = 2;
+
+
+        // データベースパス設定
+        const PUBLIC_COLLECTION_PATH = `/artifacts/${appId}/public/data/oneroom_board_posts`;
+        const USERS_COLLECTION_PATH = `/artifacts/${appId}/public/data/users`; // ユーザー情報保存用
+
+        // --- AIチャットボット機能 ---
+        
+        const MIN_POSTS_FOR_AI = 3; // AI利用に必要な最低投稿数
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent";
+        const apiKey = ""; 
+        
+        // Geminiに要求するクイズJSONスキーマ
+        const QUIZ_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                "question": { "type": "STRING" },
+                "options": {
+                    "type": "ARRAY",
+                    "description": "3つの選択肢",
+                    "items": { "type": "STRING" }
+                },
+                "correctIndex": { 
+                    "type": "NUMBER",
+                    "description": "0, 1, 2のいずれかで正解の選択肢のインデックス"
+                }, 
+                "explanation": { "type": "STRING" }
+            },
+            propertyOrdering: ["question", "options", "correctIndex", "explanation"]
         };
         
-        // 投稿完了時に実行される関数（GASのSuccess Handler）
-        const onMessagePosted = (postedMessageJson) => {
-            submitButton.disabled = false;
-            submitButton.textContent = 'ブチ込む！';
-
-            if (!postedMessageJson) {
-                errorMessages.api.classList.remove('hidden');
-                return;
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatForm = document.getElementById('ai-chat-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', handleAiChatSubmit);
             }
-
-            let postedMessage;
-            try {
-                postedMessage = JSON.parse(postedMessageJson);
-            } catch (e) {
-                console.error("Failed to parse posted message JSON:", e);
-                errorMessages.api.classList.remove('hidden');
-                return;
+            // ルームID入力欄の初期値を設定
+            document.getElementById('room-id-input').value = currentQuizId;
+        });
+        
+        // --- 共通のAI利用条件チェック ---
+        function checkAICondition() {
+            if (userPostCount < MIN_POSTS_FOR_AI) {
+                showMessage(`AI機能を利用するには、掲示板にあと${MIN_POSTS_FOR_AI - userPostCount}回投稿してください！`, true);
+                return false;
             }
+            return true;
+        }
 
-            // 新しいメッセージをリストの先頭に追加
-            const messageCard = createMessageCard(postedMessage);
-            messageList.prepend(messageCard);
+        // --- AIチャット機能 ---
 
-            // メッセージ総数を更新するために再ロード（または単にカウントをインクリメント）
-            // シンプルな更新のため、今回はカウントを再ロード
-            google.script.run.withSuccessHandler(displayMessages).getMessages(); 
-            
-            // フォームをリセット
-            messageInput.value = '';
-        };
-
-        // 投稿失敗時に実行される関数（GASのFailure Handler）
-        const onPostFailure = (error) => {
-            submitButton.disabled = false;
-            submitButton.textContent = 'ブチ込む！';
-            console.error("GAS Post Error:", error);
-            errorMessages.api.classList.remove('hidden');
-            alert("サーバー通信エラーが発生したぜ..."); // GASではalertは許可されています
-        };
-
-        // 投稿内容に著作権や肖像権に違反する可能性のあるキーワードが含まれていないかチェック
-        const checkCopyrightViolation = (text) => {
-            const forbiddenWords = [
-                "違法", "ダウンロード", "無断転載", "著作権侵害",
-                "海賊版", "不正コピー", "流出画像", "写真転載"
-            ];
-            const lowerText = text.toLowerCase();
-            return forbiddenWords.some(word => lowerText.includes(word));
-        };
-
-        // フォーム送信時の処理
-        messageForm.addEventListener('submit', (e) => {
+        async function handleAiChatSubmit(e) {
             e.preventDefault();
-            resetErrors();
+            const input = document.getElementById('ai-chat-input');
+            const query = input.value.trim();
+            if (!query) return;
 
-            const name = nameInput.value.trim() || '名無し';
-            const text = messageInput.value.trim();
-
-            if (text === '') {
-                errorMessages.empty.classList.remove('hidden');
+            if (!checkAICondition()) {
+                input.value = '';
                 return;
+            }
+
+            // ユーザーメッセージを表示
+            appendMessage(query, 'user');
+            
+            const loadingIndicator = document.getElementById('ai-loading-message');
+            const chatButton = document.getElementById('ai-chat-button');
+            
+            input.value = '';
+            chatButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                const responseText = await fetchGeminiResponse(query);
+                appendMessage(responseText, 'ai');
+            } catch (error) {
+                console.error('Gemini APIエラー:', error);
+                appendMessage("ごめんなさい、AIが少し疲れているようです...時間をおいて再度お試しください。", 'ai');
+                showMessage("AIとの通信中にエラーが発生しました。", true);
+            } finally {
+                chatButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+        
+        // (appendMessage function goes here)
+        function appendMessage(text, sender, sources = []) {
+            const history = document.getElementById('ai-chat-history');
+            const messageWrapper = document.createElement('div');
+            
+            if (sender === 'user') {
+                messageWrapper.className = 'message-wrapper self-end';
+                const userBubble = document.createElement('div');
+                userBubble.className = 'message-bubble user-message';
+                userBubble.textContent = text;
+                messageWrapper.appendChild(userBubble);
+            } else {
+                messageWrapper.className = 'message-wrapper self-start';
+                const aiBubble = document.createElement('div');
+                aiBubble.className = 'message-bubble ai-message';
+                aiBubble.textContent = text;
+                messageWrapper.appendChild(aiBubble);
+
+                if (sources.length > 0) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.className = 'text-xs text-gray-500 mt-1 ml-3 mb-2 max-w-[85%]';
+                    sourcesDiv.innerHTML = '<strong>参照元:</strong> ' + sources.map(s => 
+                        `<a href="${s.uri}" target="_blank" class="text-blue-500 hover:underline" title="${s.title}">${s.title}</a>`
+                    ).join(', ');
+                    messageWrapper.appendChild(sourcesDiv);
+                }
             }
             
-            if (checkCopyrightViolation(text)) {
-                errorMessages.copyright.classList.remove('hidden');
-                return;
-            }
+            history.appendChild(messageWrapper); 
+            history.scrollTop = history.scrollHeight; 
+        }
+        
+        // (fetchGeminiResponse function goes here)
+        async function fetchGeminiResponse(query, retries = 0) {
+            const systemPrompt = "あなたはONE OK ROCKの大ファンであり、知識豊富なフレンドリーなチャットボットです。ユーザーの質問に答え、バンドの歴史、歌詞、曲の裏話、ライブ情報について熱意を持って語りましょう。回答は日本語で、簡潔かつ情熱的に行ってください。";
 
-            const newMessage = {
-                name: name, // 好きな曲
-                text: text  // 魂の叫び
+            const payload = {
+                contents: [{ parts: [{ text: query }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
             };
 
-            // 投稿ボタンを無効化し、ロード中表示
-            submitButton.disabled = true;
-            submitButton.textContent = 'ブチ込み中...';
+            try {
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const text = candidate.content.parts[0].text;
+                    
+                    let sources = [];
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title);
+                    }
+                    
+                    return text + (sources.length > 0 ? "" : "\n\n(AIの知識に基づく回答です)");
+
+                } else {
+                    return "AIは回答を生成できませんでした。別の質問を試してみてください。";
+                }
+
+            } catch (error) {
+                if (retries < 3) {
+                    const delay = Math.pow(2, retries) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchGeminiResponse(query, retries + 1);
+                }
+                throw error;
+            }
+        }
+
+
+        // --- クイズ機能（マルチプレイヤー） ---
+        
+        /**
+         * AIにクイズ問題を生成させる (JSON形式)
+         */
+        async function generateQuizQuestion() {
+            const prompt = "ONE OK ROCKに関する、マニアックで面白い三択クイズを一つ生成してください。問題文、3つの選択肢、正解のインデックス（0, 1, 2のいずれか）、その問題の背景を解説する文章をJSON形式で提供してください。";
             
-            // GASサーバーサイド関数を呼び出し、スプレッドシートに保存
-            google.script.run
-                .withSuccessHandler(onMessagePosted)
-                .withFailureHandler(onPostFailure)
-                .postMessage(newMessage);
-        });
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: "あなたはONE OK ROCKに関するクイズのプロデューサーです。必ず要求されたJSONスキーマに従って回答を生成してください。" }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: QUIZ_SCHEMA,
+                    tools: [{ "google_search": {} }]
+                }
+            };
+            
+            try {
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-        // ページロード時の初期メッセージ読み込み
-        const loadInitialMessages = () => {
-            loadingIndicator.classList.remove('hidden');
-            google.script.run
-                .withSuccessHandler(displayMessages)
-                .withFailureHandler(onPostFailure)
-                .getMessages();
-        };
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                return JSON.parse(jsonText);
+            } catch (error) {
+                console.error("AIクイズ生成エラー:", error);
+                throw new Error("AIがクイズを生成できませんでした。");
+            }
+        }
+        
+        /**
+         * ルームIDを変更し、新しいルームに参加する (グローバル関数として定義)
+         */
+        window.changeQuizRoom = async function() {
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+            if (!checkAICondition()) return;
 
-        loadInitialMessages();
-    });
-</script>
+            const input = document.getElementById('room-id-input');
+            const newId = input.value.trim();
+
+            if (!newId) {
+                showMessage("ルームIDを入力してください。", true);
+                return;
+            }
+            
+            // 既存のルームから退出
+            if (quizListener && currentQuizId) {
+                await leaveQuizRoom(); 
+                quizListener(); // 古いリスナーを解除
+                quizListener = null;
+            }
+
+            // 新しいルームIDを設定
+            currentQuizId = newId;
+            input.value = newId; // UI表示を念のため更新
+
+            // リスナーを設定し直して、新しいルームに参加
+            setupQuizListener(); 
+
+            showMessage(`ルームIDを「${newId}」に切り替え/作成しました。`, false);
+        }
+
+        /**
+         * クイズルームに参加する (最大4人)
+         */
+        async function joinQuizRoom() {
+            if (!isAuthReady) return;
+            // 修正: quizIdではなくcurrentQuizIdを使用
+            const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId); 
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const quizDoc = await transaction.get(quizRef);
+                    let currentQuiz = quizDoc.exists() ? quizDoc.data() : { status: 'lobby', players: {} };
+                    
+                    const players = currentQuiz.players || {};
+                    const playerCount = Object.keys(players).length;
+
+                    if (players[userId]) {
+                        // 既にいる場合、ニックネームを更新
+                        players[userId].name = currentNickname;
+                    } else if (playerCount < MAX_PLAYERS) {
+                        // 初めて参加する場合
+                        players[userId] = { 
+                            name: currentNickname, 
+                            score: 0, 
+                            joinedAt: serverTimestamp() 
+                        };
+                    } else {
+                        // 満員の場合、トランザクションを中断
+                        showMessage(`ルーム「${currentQuizId}」は満員です (最大4名)。`, true);
+                        return;
+                    }
+
+                    // ルームの状態を更新
+                    transaction.set(quizRef, {
+                        ...currentQuiz,
+                        players: players,
+                        status: currentQuiz.status === 'active' ? 'active' : 'lobby',
+                        scores: currentQuiz.scores || {} // スコアが存在しない場合は初期化
+                    }, { merge: true });
+                });
+            } catch (e) {
+                console.error("クイズルーム参加トランザクション失敗:", e);
+                // トランザクション失敗時もエラーメッセージは表示しない (頻繁に起こる可能性があるため)
+            }
+        }
+        
+        /**
+         * クイズルームから退出する
+         */
+        async function leaveQuizRoom() {
+            if (!isAuthReady) return;
+            // 修正: quizIdではなくcurrentQuizIdを使用
+            const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId); 
+            
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const quizDoc = await transaction.get(quizRef);
+                    if (!quizDoc.exists()) return;
+
+                    let currentQuiz = quizDoc.data();
+                    let players = currentQuiz.players || {};
+
+                    if (players[userId]) {
+                        delete players[userId];
+                    } else {
+                        return;
+                    }
+
+                    // 最後のプレイヤーが退出した場合、ドキュメントを削除してリセット（ロビー状態のみ）
+                    // active中でもプレイヤーが0になれば削除
+                    if (Object.keys(players).length === 0) {
+                        transaction.delete(quizRef);
+                    } else {
+                        transaction.update(quizRef, {
+                            players: players,
+                        });
+                    }
+                });
+            } catch (e) {
+                console.error("クイズルーム退出トランザクション失敗:", e);
+            }
+        }
+        
+        // ページを閉じる前に退出処理を実行 (ベストエフォート)
+        window.addEventListener('beforeunload', leaveQuizRoom);
+
+
+        /**
+         * 新しいクイズセッションを開始する (2人以上が必要)
+         */
+        window.startNewQuiz = async function() {
+            if (!isAuthReady || !checkAICondition()) return;
+            
+            const controlButton = document.getElementById('start-quiz-button');
+            const loading = document.getElementById('quiz-loading-message');
+            
+            controlButton.disabled = true;
+            loading.classList.remove('hidden');
+
+            try {
+                const currentPlayers = quizState ? Object.keys(quizState.players).length : 0;
+                if (currentPlayers < MIN_PLAYERS_TO_START) {
+                    showMessage(`クイズを開始するには、${MIN_PLAYERS_TO_START}人以上の参加者が必要です。現在${currentPlayers}人です。`, true);
+                    return; // プレイヤー数が不足
+                }
+
+                // 1. AIに最初の問題生成を要求
+                const quizData = await generateQuizQuestion();
+                
+                // 2. Firestoreをトランザクションで初期化
+                // 修正: quizIdではなくcurrentQuizIdを使用
+                const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId); 
+                
+                await runTransaction(db, async (transaction) => {
+                     const quizDoc = await transaction.get(quizRef);
+                     let players = quizDoc.exists() ? quizDoc.data().players : {};
+                     
+                     // 現在のプレイヤー全員のスコアをリセット
+                     const initialScores = {};
+                     for (const id in players) {
+                         initialScores[id] = { name: players[id].name, score: 0 };
+                     }
+
+                     transaction.set(quizRef, {
+                        status: 'active', // Game is now active
+                        question: quizData.question,
+                        options: quizData.options,
+                        correctIndex: quizData.correctIndex,
+                        explanation: quizData.explanation,
+                        questionNumber: 1,
+                        players: players, // 現在のプレイヤーを保持
+                        scores: initialScores, 
+                        answeredBy: {}, 
+                        correctAnswer: null,
+                        answeredCount: 0,
+                        timestamp: serverTimestamp()
+                    });
+                });
+                
+                showMessage("新しいクイズが開始されました！ 第1問スタート！", false);
+            } catch (error) {
+                console.error("クイズ開始エラー:", error);
+                showMessage(`クイズの開始に失敗しました: ${error.message}`, true);
+            } finally {
+                controlButton.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        /**
+         * 次の問題をリクエストする（誰でも実行可能だが、状態はFirestoreが管理）
+         */
+        window.requestNextQuestion = async function() {
+            if (!isAuthReady || !checkAICondition() || quizState.status !== 'resolved') return; 
+            
+            const controlButton = document.getElementById('next-question-button');
+            const loading = document.getElementById('quiz-loading-message');
+            
+            controlButton.disabled = true;
+            loading.classList.remove('hidden');
+
+            try {
+                // 1. AIに次の問題生成を要求
+                const quizData = await generateQuizQuestion();
+                
+                // 2. Firestoreを更新（次の問題へ）
+                // 修正: quizIdではなくcurrentQuizIdを使用
+                const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId); 
+                
+                await updateDoc(quizRef, {
+                    status: 'active',
+                    question: quizData.question,
+                    options: quizData.options,
+                    correctIndex: quizData.correctIndex,
+                    explanation: quizData.explanation,
+                    questionNumber: quizState.questionNumber + 1,
+                    // スコアとプレイヤーリストは維持
+                    answeredBy: {}, 
+                    correctAnswer: null,
+                    answeredCount: 0,
+                    timestamp: serverTimestamp()
+                });
+                
+                showMessage(`第${quizState.questionNumber + 1}問がスタートしました！`, false);
+            } catch (error) {
+                console.error("次の問題の生成エラー:", error);
+                showMessage(`次の問題の生成に失敗しました: ${error.message}`, true);
+            } finally {
+                controlButton.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        /**
+         * クイズの回答処理（最初に正解した人にポイント）
+         */
+        window.handleQuizAnswer = async function(answerIndex) {
+            if (!isAuthReady || quizState.correctAnswer || quizState.status !== 'active') return;
+            
+            // プレイヤーとして参加しているかチェック
+            if (!quizState.players || !quizState.players[userId]) {
+                showMessage("クイズに参加していません。ルームに参加してください。", true);
+                return;
+            }
+
+            // 修正: quizIdではなくcurrentQuizIdを使用
+            const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId); 
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const quizDoc = await transaction.get(quizRef);
+                    if (!quizDoc.exists()) throw "Quiz not found";
+
+                    const currentQuiz = quizDoc.data();
+
+                    // 既に回答済みかチェック
+                    if (currentQuiz.answeredBy[userId] !== undefined) {
+                        showMessage("あなたは既にこの問題に回答済みです。", true);
+                        return;
+                    }
+
+                    const isCorrect = answerIndex === currentQuiz.correctIndex;
+                    const newAnsweredBy = { ...currentQuiz.answeredBy, [userId]: answerIndex };
+                    
+                    let newScores = currentQuiz.scores || {};
+                    let newCorrectAnswer = currentQuiz.correctAnswer;
+                    let newStatus = currentQuiz.status;
+                    
+                    if (!newScores[userId]) {
+                         newScores[userId] = { name: currentNickname, score: 0 };
+                    }
+
+                    if (isCorrect) {
+                        if (currentQuiz.correctAnswer === null) {
+                            // 最初の正解者！
+                            newCorrectAnswer = userId;
+                            newScores[userId].score += 10;
+                            newStatus = 'resolved'; 
+                            
+                            transaction.update(quizRef, {
+                                answeredBy: newAnsweredBy,
+                                scores: newScores,
+                                correctAnswer: newCorrectAnswer,
+                                status: newStatus,
+                                answeredCount: (currentQuiz.answeredCount || 0) + 1,
+                            });
+                            showMessage("🎉 正解！最初に正解しました！10点ゲット！", false);
+                        } else {
+                            // 正解だが、既に正解者がいる
+                            transaction.update(quizRef, {
+                                answeredBy: newAnsweredBy,
+                                answeredCount: (currentQuiz.answeredCount || 0) + 1,
+                            });
+                            showMessage("正解！しかし、最初に正解した人がいました。", false);
+                        }
+                    } else {
+                        // 不正解
+                        transaction.update(quizRef, {
+                            answeredBy: newAnsweredBy,
+                            answeredCount: (currentQuiz.answeredCount || 0) + 1,
+                        });
+                        showMessage("残念、不正解です...。", true);
+                    }
+                });
+            } catch (e) {
+                console.error("クイズ回答トランザクション失敗:", e);
+                showMessage("クイズの回答処理中にエラーが発生しました。", true);
+            }
+        }
+
+
+        /**
+         * クイズ状態のリアルタイムリスナー設定
+         */
+        function setupQuizListener() {
+            if (quizListener) quizListener(); // 既存のリスナーを解除
+
+            // 修正: quizIdではなくcurrentQuizIdを使用
+            const quizRef = doc(db, QUIZ_COLLECTION_PATH, currentQuizId);
+            
+            // ユーザーがルームを開いたとき、自動で参加を試みる
+            if (isAuthReady) {
+                joinQuizRoom(); 
+            }
+
+            quizListener = onSnapshot(quizRef, (doc) => {
+                if (doc.exists()) {
+                    quizState = doc.data();
+                    renderQuizUI(quizState);
+                } else {
+                    // ドキュメントが存在しない場合 (誰もいない場合や削除された場合)
+                    quizState = { status: 'lobby', players: {} };
+                    renderQuizUI(quizState); 
+                    // 削除された場合、自動で再参加を試みる
+                    if (isAuthReady) joinQuizRoom(); 
+                }
+            }, (error) => {
+                console.error("クイズリスナーエラー:", error);
+                quizState = { status: 'error', players: {} };
+                renderQuizUI(quizState);
+            });
+        }
+        
+        /**
+         * クイズUIの描画処理
+         */
+        function renderQuizUI(state) {
+            const statusMessage = document.getElementById('quiz-status-message');
+            const questionContainer = document.getElementById('quiz-question-container');
+            const quizOptions = document.getElementById('quiz-options');
+            const startButton = document.getElementById('start-quiz-button');
+            const nextButton = document.getElementById('next-question-button');
+            const currentQuestion = document.getElementById('current-question');
+            const scoreboardList = document.getElementById('scoreboard-list');
+            const playerSlots = document.getElementById('player-slots');
+            const playerCountSpan = document.getElementById('player-count');
+
+            // --- プレイヤーとロビーの状態を更新 ---
+            const players = state.players || {};
+            const playerIds = Object.keys(players);
+            const playerCount = playerIds.length;
+            
+            playerCountSpan.textContent = playerCount;
+            playerSlots.innerHTML = '';
+            
+            // プレイヤースロットの描画
+            for (let i = 0; i < MAX_PLAYERS; i++) {
+                const name = players[playerIds[i]] ? players[playerIds[i]].name : null;
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'flex items-center space-x-1 p-1 rounded-full text-xs font-semibold';
+                
+                if (name) {
+                    // 自分のニックネームは強調
+                    const isMe = playerIds[i] === userId;
+                    playerDiv.innerHTML = `<span class="bg-green-500 w-2 h-2 rounded-full"></span><span class="${isMe ? 'text-primary' : 'text-gray-700'}">${name}${isMe ? ' (あなた)' : ''}</span>`;
+                } else {
+                    playerDiv.innerHTML = `<span class="bg-gray-300 w-2 h-2 rounded-full"></span><span class="text-gray-500">空き(${i + 1}人目)</span>`;
+                }
+                playerSlots.appendChild(playerDiv);
+            }
+
+            // --- コントロールボタンとメッセージの管理 ---
+
+            if (state.status === 'lobby' || state.status === 'finished' || state.status === 'error' || !state.status) {
+                // ロビー状態
+                questionContainer.classList.add('hidden');
+                startButton.classList.remove('hidden');
+                nextButton.classList.add('hidden');
+                
+                if (playerCount < MIN_PLAYERS_TO_START) {
+                    startButton.disabled = true;
+                    statusMessage.textContent = `クイズを開始するには、あと${MIN_PLAYERS_TO_START - playerCount}人が必要です。（最大${MAX_PLAYERS}人）`;
+                } else {
+                    startButton.disabled = false;
+                    statusMessage.textContent = `参加者：${playerCount}人。クイズを開始できます！`;
+                }
+                
+                scoreboardList.innerHTML = '<p class="text-xs text-gray-400">クイズ開始後にスコアが表示されます。</p>';
+                if (state.status === 'finished') {
+                    statusMessage.textContent = "ゲーム終了！スコアボードを確認してください。";
+                }
+                return;
+            }
+            
+            // --- クイズアクティブ時 ---
+            questionContainer.classList.remove('hidden');
+            startButton.classList.add('hidden');
+
+            currentQuestion.textContent = `Q${state.questionNumber}: ${state.question}`;
+            quizOptions.innerHTML = '';
+            
+            const hasAnswered = state.answeredBy && state.answeredBy[userId] !== undefined;
+            const isResolved = state.status === 'resolved';
+            
+            // --- 選択肢の描画 ---
+            state.options.forEach((option, index) => {
+                const optionButton = document.createElement('button');
+                optionButton.textContent = `${index + 1}. ${option}`;
+                optionButton.className = `quiz-option w-full p-3 text-left rounded-lg transition duration-150 border font-medium whitespace-normal ${isResolved ? 'cursor-default' : 'cursor-pointer'}`;
+                
+                // 回答済み、または解決済み、またはプレイヤーでなければ無効化
+                optionButton.disabled = hasAnswered || isResolved || !players[userId]; 
+                
+                optionButton.onclick = () => window.handleQuizAnswer(index);
+                
+                // --- 結果表示 ---
+                if (isResolved) {
+                    if (index === state.correctIndex) {
+                        optionButton.className += ' bg-green-200 text-green-800 border-green-400';
+                        optionButton.textContent += ' 🎉正解';
+                    } else if (hasAnswered && index === state.answeredBy[userId]) {
+                        optionButton.className += ' bg-red-200 text-red-800 border-red-400';
+                        optionButton.textContent += ' ❌あなたの回答';
+                    } else {
+                        optionButton.className += ' bg-white text-gray-700 border-gray-300';
+                    }
+                } else if (hasAnswered && index === state.answeredBy[userId]) {
+                     // 回答済みの選択肢（解答中）
+                    optionButton.className += ' bg-yellow-100 text-gray-700 border-yellow-300';
+                } else {
+                    optionButton.className += ' bg-white text-gray-700 border-gray-300';
+                }
+                
+                quizOptions.appendChild(optionButton);
+            });
+            
+            // --- ステータスとコントロールボタンの更新 ---
+            if (isResolved) {
+                const correctUserName = state.scores[state.correctAnswer] ? state.scores[state.correctAnswer].name : '不明なユーザー';
+                statusMessage.innerHTML = `✅ **正解発表！** 正解は**${state.correctIndex + 1}番**でした。<br>最初に正解したのは **${correctUserName}** さん！<br>
+                                    <span class="text-sm mt-2 block">${state.explanation}</span>`;
+                // 次の問題へボタンを表示
+                nextButton.classList.remove('hidden');
+            } else {
+                statusMessage.textContent = `第${state.questionNumber}問に回答してください！ (${state.answeredCount}人回答済み)`;
+                nextButton.classList.add('hidden');
+            }
+            
+            // --- スコアボードの更新 ---
+            scoreboardList.innerHTML = '';
+            
+            const sortedScores = Object.values(state.scores || {}).sort((a, b) => b.score - a.score);
+            
+            if (sortedScores.length > 0) {
+                sortedScores.forEach((player, index) => {
+                    const scoreItem = document.createElement('p');
+                    // 1位の色を強調
+                    const isTop = index === 0 && player.score > 0;
+                    scoreItem.className = `font-bold p-1 rounded-md text-sm ${isTop ? 'text-primary' : 'text-gray-700'}`;
+                    scoreItem.innerHTML = `${isTop ? '🏆' : ''} ${player.name}: <span class="text-primary">${player.score}点</span>`;
+                    scoreboardList.appendChild(scoreItem);
+                });
+            } else {
+                scoreboardList.innerHTML = '<p class="text-xs text-gray-400">参加者がいません。</p>';
+            }
+        }
+
+
+        // --- ユーザー情報（ニックネーム, 投稿数）関連 ---
+        
+        async function fetchNickname() {
+            if (!userId) return;
+            const userRef = doc(db, USERS_COLLECTION_PATH, userId);
+            try {
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists() && userDoc.data().nickname) {
+                    currentNickname = userDoc.data().nickname;
+                }
+            } catch (error) {
+                console.error("ニックネーム取得エラー:", error);
+            }
+            updateUserInfoDisplay();
+        }
+
+        async function saveNickname(e) {
+            e.preventDefault();
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+            
+            const nicknameInput = document.getElementById('nickname-input');
+            const newNickname = nicknameInput.value.trim();
+
+            if (newNickname.length < 3) {
+                showMessage("ニックネームは3文字以上で入力してください。", true);
+                return;
+            }
+
+            try {
+                const userRef = doc(db, USERS_COLLECTION_PATH, userId);
+                await setDoc(userRef, { nickname: newNickname }, { merge: true });
+                currentNickname = newNickname;
+                updateUserInfoDisplay();
+                hideNicknameModal();
+                showMessage(`ニックネームを「${newNickname}」に設定しました。`, false);
+                
+                // ニックネーム変更後、クイズルームの参加情報を更新
+                joinQuizRoom(); 
+            } catch (error) {
+                console.error("ニックネーム保存エラー:", error);
+                showMessage("ニックネームの保存に失敗しました。", true);
+            }
+        }
+
+        async function getUserPostCount() {
+            if (!userId || !isAuthReady) {
+                userPostCount = 0;
+                return;
+            }
+            try {
+                const postsColRef = collection(db, PUBLIC_COLLECTION_PATH);
+                // ユーザーIDが一致する投稿をフィルタリング
+                const q = query(postsColRef, where("userId", "==", userId));
+                
+                // ドキュメント数カウント
+                const snapshot = await getDocs(q);
+                userPostCount = snapshot.size;
+                
+            } catch (error) {
+                console.error("ユーザー投稿数取得エラー:", error);
+                userPostCount = 0;
+            }
+            document.getElementById('user-post-count').textContent = userPostCount;
+        }
+        
+        function updateUserInfoDisplay() {
+            const userInfoElement = document.getElementById('user-info');
+            userInfoElement.innerHTML = `ニックネーム: <strong class="text-primary">${currentNickname}</strong>`;
+            
+            const nicknameInput = document.getElementById('nickname-input');
+            if (nicknameInput) nicknameInput.value = currentNickname;
+        }
+
+        window.showNicknameModal = function() {
+            document.getElementById('nickname-modal').classList.remove('hidden');
+        }
+
+        window.hideNicknameModal = function() {
+            document.getElementById('nickname-modal').classList.add('hidden');
+        }
+
+        // --- ONE OK ROCK 楽曲リスト (予測変換用) ---
+        const OOR_SONGS = [
+            "Introduction", "内秘心書", "Borderline", "（You can do）it!", "努努-ゆめゆめ-", "カラス", 
+            "Crazy Bot", "乱獲Creature", "後悔S.O.S.", "必然メーカー", "One day", "夜にしか咲かない満月", 
+            "皆無", "20 years old", "Living dolls", "Break My Strings", "My sweet baby", "Reflection", 
+            "around the world 少年", "恋ノアイボウ心ノクピド", "Viva la revolution", "Et cetera", 
+            "Wherever you are", "Jibun ROCK", "Liar", "Pierce", "C.h.a.o.s.m.y.t.h.", 
+            "Let's take it someday", "Kimikara-sensei", "世間知らずの宇宙飛行士", "Mr.現代Speaker", 
+            "未完成交響曲", "Nobody's Home", "Kanzen Kankaku Dreamer", "Kagerou", "Deeper Deeper", 
+            "Nothing Helps", "The Beginning", "Clock Strikes", "Be the light", "All Mine", 
+            "Smiling down", "Decision", "Mighty Long Fall", "Heartache", "Suddenly", 
+            "Stuck in the middle", "Good Goodbye", "One By One", "Paper Planes", "3xxxv5", 
+            "Take me to the top", "Cry out", "The Way Back", "Memories", "Oh my god", 
+            "Footsteps - In My Life -", "Ambitions - Introduction -", "Bombs Away", "Taking Off", 
+            "We are", "20/20", "Always coming back", "Bedroom Warfare", "Lost in Tonight", 
+            "I was King", "One Way Ticket", "Bon Voyage", "Start Again", "Eye of the Storm", 
+            "Stand Out Fit In", "Head High", "Grow Old Die Young", "Push Back", "Wasted Nights", 
+            "Change", "Let me let you go", "Worst in Me", "Giants", "Can't Wait", "The Last Time",
+            "Save yourself", "Neon", "Vandalize", "When They All Fall Down", "Gravity", 
+            "Mad World", "Free Them", "Renegades", "Broken Heart of Gold", "Wonder", "Prove",
+            "Dive in the deep end", "Daydreaming", "Letting go", "So far gone"
+        ];
+        
+        // --- 日替わりテーマ定義 (JST 0:00で切り替わる) ---
+        const OOR_THEMES = [
+            { name: "Ambitions (赤/濃紺)", primaryColor: "#FF5050", secondaryColor: "#1A2035", backgroundColor: "#F8F8F8" },
+            { name: "Eye of the Storm (青/金)", primaryColor: "#00AEEF", secondaryColor: "#FFD700", backgroundColor: "#F0F4F7" },
+            { name: "35xxxv (グレー/紺)", primaryColor: "#797673", secondaryColor: "#2C3E50", backgroundColor: "#EAEAEA" },
+            { name: "Luxury Disease (紫/橙)", primaryColor: "#8A2BE2", secondaryColor: "#FF4500", backgroundColor: "#FAFAFA" },
+            { name: "Nicheシンドローム (チャコール/金)", primaryColor: "#36454F", secondaryColor: "#B8860B", backgroundColor: "#FFFFFF" }
+        ];
+
+        function applyDailyTheme() {
+            // 現在の日本時間 (JST) を取得
+            const now = new Date();
+            // UTC時間を取得し、JST (+9時間) に変換
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const jstNow = new Date(utc + (3600000 * 9));
+            
+            // JSTの日付（日）に基づいてテーマを決定
+            const day = jstNow.getDate();
+            const themeIndex = day % OOR_THEMES.length; // 5つのテーマをローテーション
+            const theme = OOR_THEMES[themeIndex];
+
+            const root = document.documentElement;
+            // CSSカスタムプロパティを更新
+            root.style.setProperty('--color-primary', theme.primaryColor);
+            root.style.setProperty('--color-secondary', theme.secondaryColor);
+            root.style.setProperty('--color-background', theme.backgroundColor);
+            
+            // bodyの背景色を動的に設定
+            document.body.style.backgroundColor = theme.backgroundColor;
+
+            showMessage(`今日のテーマは「${theme.name}」です！`, false);
+        }
+
+        // --- ユーティリティ関数 ---
+
+        function showMessage(text, isError = false) {
+            const area = document.getElementById('message-area');
+            const element = document.createElement('div');
+            element.className = `p-3 mb-2 rounded-lg shadow-md text-white ${isError ? 'bg-red-500' : 'bg-green-500'}`;
+            element.textContent = text;
+            area.appendChild(element);
+
+            setTimeout(() => {
+                element.remove();
+            }, 3000);
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '日時不明';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            
+            // JST (UTC+9) で表示するように明示的にタイムゾーンを指定
+            return date.toLocaleString('ja-JP', {
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false, // 24時間表示
+                timeZone: 'Asia/Tokyo' // 東京時間 (JST) を指定
+            });
+        }
+
+        // --- 初期化と認証 ---
+
+        async function initializeFirebase() {
+            // テーマを最初に適用
+            applyDailyTheme(); 
+            
+            try {
+                // setLogLevel('debug');
+
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // onAuthStateChangedが認証状態の変更を待ち、処理を行う
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                    } else {
+                        const anonUser = await signInAnonymously(auth);
+                        userId = anonUser.user.uid;
+                    }
+
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        userId = auth.currentUser.uid;
+                    }
+
+                    isAuthReady = true; // 認証完了
+                    
+                    // 認証完了後にニックネームと投稿数をロード
+                    await fetchNickname();
+                    await getUserPostCount(); 
+                    
+                    if (localStorage.getItem('termsAgreed') === 'true') {
+                        loadBoardDisplay(); 
+                        loadBoardData(); // 掲示板データのロードも認証完了後に行う
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebaseの初期化中にエラーが発生しました:", error);
+                showMessage("初期化エラーが発生しました。コンソールを確認してください。", true);
+            }
+        }
+
+        // --- 利用規約の処理 ---
+
+        window.agreeToTerms = function() {
+            localStorage.setItem('termsAgreed', 'true');
+            document.getElementById('terms-modal').classList.add('hidden');
+            
+            loadBoardDisplay(); 
+
+            // 修正: isAuthReadyがtrueになっていれば、ここでデータをロード
+            if (isAuthReady) {
+                loadBoardData(); 
+            } else {
+                showMessage("認証中です。しばらくお待ちください。データがロードされるまで投稿の閲覧・投稿はできません。", false);
+            }
+        }
+
+        function checkTermsAgreement() {
+            if (localStorage.getItem('termsAgreed') === 'true') {
+                document.getElementById('terms-modal').classList.add('hidden');
+            } else {
+                document.getElementById('terms-modal').classList.remove('hidden');
+            }
+        }
+
+        // --- メイン掲示板のロード ---
+        
+        function loadBoardDisplay() {
+            document.getElementById('main-content').classList.remove('hidden');
+            
+            // ニックネームフォームのリスナーを設定
+            document.getElementById('nickname-form').addEventListener('submit', saveNickname);
+            
+            setupPostForm();
+            // 編集フォームの保存リスナーを設定
+            document.getElementById('edit-form').addEventListener('submit', savePostEdit);
+            
+            // --- 削除確認ボタンのリスナーを設定 ---
+            document.getElementById('confirm-delete-button').addEventListener('click', confirmedDeletePost);
+
+            // 固定リンクの表示
+            renderFixedLiveLink(); 
+        }
+
+        function loadBoardData() {
+            // 認証チェックを確実にするため、ここで再チェック
+            if (!isAuthReady) return; 
+            setupPostListener();
+            setupQuizListener();
+        }
+
+
+        // --- 投稿処理と予測変換機能 ---
+
+        function setupPostForm() {
+            const postTitleInput = document.getElementById('post-title');
+            const suggestionsContainer = document.getElementById('title-suggestions');
+            
+            // --- 予測変換機能の追加 ---
+            
+            postTitleInput.addEventListener('input', () => {
+                showSuggestions(postTitleInput.value.trim(), postTitleInput, suggestionsContainer);
+            });
+            
+            postTitleInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    suggestionsContainer.innerHTML = '';
+                }, 200); 
+            });
+
+
+            // フォーム送信処理 
+            document.getElementById('post-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!isAuthReady) {
+                    showMessage("認証が完了していません。", true);
+                    return;
+                }
+
+                const title = document.getElementById('post-title').value.trim();
+                const content = document.getElementById('post-content').value.trim();
+
+                if (!title || !content) {
+                    showMessage("タイトルと内容を両方入力してください。", true);
+                    return;
+                }
+
+                try {
+                    await addDoc(collection(db, PUBLIC_COLLECTION_PATH), {
+                        title: title,
+                        content: content,
+                        userId: userId,
+                        userName: currentNickname, // ニックネームを保存
+                        timestamp: serverTimestamp(),
+                        likes: 0,
+                        likedBy: [], // いいねしたユーザーIDの配列
+                    });
+
+                    showMessage("投稿が完了しました！");
+                    document.getElementById('post-form').reset();
+                    
+                    // 投稿成功後、投稿数を更新
+                    await getUserPostCount(); 
+                } catch (error) {
+                    console.error("投稿エラー:", error);
+                    showMessage("投稿に失敗しました。", true);
+                }
+            });
+        }
+        
+        /**
+         * 予測変換を表示する
+         */
+        function showSuggestions(inputValue, inputElement, container) {
+            container.innerHTML = '';
+            if (inputValue.length === 0) {
+                return;
+            }
+
+            const lowerInput = inputValue.toLowerCase();
+            
+            const filteredSongs = OOR_SONGS.filter(song => 
+                song.toLowerCase().startsWith(lowerInput)
+            ).slice(0, 8); // 最大8件に限定
+
+            if (filteredSongs.length > 0) {
+                const suggestionList = document.createElement('div');
+                suggestionList.className = 'absolute w-full bg-white border border-gray-300 rounded-lg shadow-xl max-h-40 overflow-y-auto';
+                
+                filteredSongs.forEach(song => {
+                    const item = document.createElement('div');
+                    item.className = 'p-2 cursor-pointer text-gray-800 hover:bg-red-100 transition duration-100 truncate';
+                    item.textContent = song;
+                    
+                    item.addEventListener('mousedown', (e) => { 
+                        e.preventDefault();
+                        inputElement.value = song;
+                        container.innerHTML = ''; 
+                        inputElement.focus(); 
+                    });
+                    
+                    suggestionList.appendChild(item);
+                });
+                
+                container.appendChild(suggestionList);
+            }
+        }
+
+
+        // --- 投稿のリアルタイム表示とフィルタリング/ソート機能 ---
+
+        function setupPostListener() {
+            // 修正: 認証チェック
+            if (!isAuthReady) {
+                console.warn("setupPostListener: 認証が完了していません。処理をスキップします。");
+                return;
+            }
+
+            const loadingMessage = document.getElementById('loading-message'); 
+            
+            // Firestoreからデータを取得するクエリ (ソートは行わない、最新順で取得)
+            const q = query(collection(db, PUBLIC_COLLECTION_PATH), orderBy('timestamp', 'desc'));
+
+            // onSnapshotでデータをリアルタイムに取得し、allPostsに保存する
+            onSnapshot(q, (snapshot) => {
+                
+                if (loadingMessage) {
+                    loadingMessage.classList.add('hidden');
+                }
+
+                if (snapshot.empty) {
+                    allPosts = [];
+                    renderPosts([]); // 投稿がない場合は空のリストをレンダリング
+                    return;
+                }
+
+                // 1. 取得したすべての投稿をグローバル変数に保存
+                allPosts = [];
+                snapshot.forEach(doc => {
+                    allPosts.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // 2. 現在のソートとフィルタリングの状態を維持してレンダリング
+                window.sortAndRenderPosts(); 
+
+            }, (error) => {
+                console.error("投稿の取得エラー:", error);
+                
+                if (loadingMessage) {
+                    loadingMessage.classList.add('hidden');
+                }
+                document.getElementById('posts-container').innerHTML = `<p class="text-center text-red-500 p-8">データの取得中にエラーが発生しました: ${error.message}</p>`;
+            });
+        }
+        
+        /**
+         * 現在のソート基準、ユーザーフィルターに基づいて投稿をソート・フィルタリングし、レンダリングする
+         * (グローバル関数として定義)
+         */
+        window.sortAndRenderPosts = function() {
+            let postsToRender = [...allPosts]; // allPostsのコピーを作成
+            const sortCriteria = document.getElementById('sort-criteria').value;
+            const filterInput = document.getElementById('filter-input');
+            const filterTerm = filterInput ? filterInput.value.trim().toLowerCase() : null;
+
+            // --- ユーザーIDフィルタリング (最優先) ---
+            const clearFilterButton = document.getElementById('clear-user-filter-button');
+            if (userFilterId) {
+                postsToRender = postsToRender.filter(post => post.userId === userFilterId);
+                clearFilterButton.classList.remove('hidden');
+            } else {
+                 clearFilterButton.classList.add('hidden');
+            }
+
+            // --- キーワードフィルタリング ---
+            if (filterTerm) {
+                postsToRender = postsToRender.filter(post => 
+                    post.title.toLowerCase().includes(filterTerm)
+                );
+            }
+
+            // --- ソートの適用 ---
+            if (sortCriteria === 'popular') {
+                // いいねの数（likes）が多い順にソート
+                postsToRender.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+            } else { // 'latest'
+                // タイムスタンプが新しい順にソート
+                postsToRender.sort((a, b) => {
+                    const timeA = a.timestamp && a.timestamp.toMillis ? a.timestamp.toMillis() : 0;
+                    const timeB = b.timestamp && b.timestamp.toMillis ? b.timestamp.toMillis() : 0;
+                    return timeB - timeA;
+                });
+            }
+            
+            // 描画
+            renderPosts(postsToRender);
+        }
+        
+        /**
+         * ユーザーIDによる投稿絞り込みを実行する (グローバル関数として定義)
+         * @param {string} id - 絞り込むユーザーのID
+         * @param {string} name - 絞り込むユーザーのニックネーム
+         */
+        window.filterByUser = function(id, name) {
+            userFilterId = id;
+            window.sortAndRenderPosts();
+            // 修正: IDではなくニックネームを表示
+            showMessage(`${name}さんの投稿に絞り込みました。`, false);
+        }
+        
+        /**
+         * ユーザーIDによる絞り込みを解除する (グローバル関数として定義)
+         */
+        window.clearUserFilter = function() {
+            userFilterId = null;
+            document.getElementById('filter-input').value = ''; // キーワード検索もクリア
+            window.sortAndRenderPosts();
+            showMessage("ユーザー投稿一覧の絞り込みを解除しました。", false);
+        }
+        
+        /**
+         * フィルターボタンが押された時の処理（グローバル関数として定義）
+         */
+        window.handleFilter = function() {
+            userFilterId = null; // キーワード検索時はユーザーIDフィルタを解除
+            window.sortAndRenderPosts();
+            
+            const filterTerm = document.getElementById('filter-input').value.trim().toLowerCase();
+            if (filterTerm) {
+                showMessage(`「${filterTerm}」を含む投稿を絞り込みました。`, false);
+            } else {
+                showMessage(`絞り込みをリセットしました。`, false);
+            }
+        }
+
+        /**
+         * 投稿配列を元にDOMをレンダリングする
+         * @param {Array} postsToRender 表示する投稿オブジェクトの配列
+         */
+        function renderPosts(postsToRender) {
+            const postsContainer = document.getElementById('posts-container');
+            postsContainer.innerHTML = ''; // 一度コンテナをクリア
+
+            if (postsToRender.length === 0) {
+                postsContainer.innerHTML = '<p class="text-center text-gray-500 p-8">該当する投稿は見つかりませんでした。</p>';
+                return;
+            }
+
+            postsToRender.forEach(post => {
+                const postElement = createPostElement(post.id, post);
+                postsContainer.appendChild(postElement);
+                // コメントリスナーの再設定 (postIdはpost.idに含まれている)
+                setupCommentListener(post.id);
+            });
+        }
+
+        // 投稿要素のDOM構築
+        function createPostElement(postId, post) {
+            const postDiv = document.createElement('div');
+            postDiv.id = `post-${postId}`;
+            postDiv.className = 'bg-white p-6 rounded-xl shadow-lg border border-gray-200';
+            
+            const isLiked = post.likedBy && post.likedBy.includes(userId);
+            const isAuthor = post.userId === userId; // 著者チェック
+            
+            // いいねボタンの色もテーマカラーに合わせる
+            const likeButtonColor = isLiked ? 'text-primary' : 'text-gray-400';
+            const likeButtonFill = isLiked ? 'fill-current' : 'fill-none';
+            
+            // 著者用のアクションボタン
+            const authorActionsHTML = isAuthor ? `
+                <div class="flex space-x-2 mt-3 justify-end">
+                    <button onclick="showEditModal('${postId}')" class="text-xs text-blue-500 hover:text-blue-700 font-medium py-1 px-2 rounded-lg transition duration-150 border border-blue-200">
+                        編集
+                    </button>
+                    <button onclick="deletePost('${postId}')" class="text-xs text-red-500 hover:text-red-700 font-medium py-1 px-2 rounded-lg transition duration-150 border border-red-200">
+                        削除
+                    </button>
+                </div>
+            ` : '';
+            
+            const postUserName = post.userName || "名無しOORer"; // ニックネームの利用
+
+            postDiv.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-xl font-bold text-gray-800 break-words">${post.title}</h3>
+                    <button class="like-button flex items-center p-2 rounded-full hover:bg-red-50 transition duration-150" data-post-id="${postId}" onclick="toggleLike('${postId}', ${isLiked})">
+                        <svg class="w-6 h-6 ${likeButtonColor} ${likeButtonFill}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                        <span id="like-count-${postId}" class="ml-1 text-sm font-semibold text-gray-600">${post.likes || 0}</span>
+                    </button>
+                </div>
+                <p class="text-gray-700 mb-4 whitespace-pre-wrap break-words">${post.content}</p>
+                
+                ${authorActionsHTML} <!-- 編集・削除ボタンを挿入 -->
+
+                <div class="text-xs text-gray-500 border-t pt-2 mt-4 flex justify-between items-center">
+                    <!-- ニックネームをクリックで絞り込み -->
+                    <span class="cursor-pointer hover:underline text-gray-600 font-medium" onclick="filterByUser('${post.userId}', '${postUserName}')">
+                        投稿者: ${postUserName}
+                    </span>
+                    <span>投稿日時: ${formatTimestamp(post.timestamp)}</span>
+                </div>
+
+                <!-- コメントセクション -->
+                <div class="mt-5 border-t pt-4">
+                    <h4 class="text-md font-semibold mb-3 text-gray-700">コメント (<span id="comment-count-${postId}">0</span>件)</h4>
+                    <div id="comments-list-${postId}" class="space-y-3 mb-4">
+                        <!-- コメントがここに表示されます -->
+                    </div>
+                    
+                    <!-- トップレベルコメント投稿フォーム -->
+                    <form class="comment-form flex" data-post-id="${postId}" data-parent-id="">
+                        <input type="text" placeholder="コメントを入力..." class="comment-input w-full p-2 border border-gray-300 rounded-l-lg text-sm focus:ring-primary focus:border-primary" required maxlength="500">
+                        <!-- テーマカラーを適用 -->
+                        <button type="submit" class="bg-primary hover:bg-secondary text-white text-sm font-bold px-4 py-2 rounded-r-lg transition duration-150">
+                            送信
+                        </button>
+                    </form>
+                </div>
+            `;
+            
+            // コメントフォームのイベントリスナーを設定
+            postDiv.querySelector('.comment-form').addEventListener('submit', handleCommentSubmit);
+
+            return postDiv;
+        }
+
+        // --- 固定ライブ情報リンクの表示（検索サービスを使用しない） ---
+
+        function renderFixedLiveLink() {
+            const container = document.getElementById('live-info-container');
+            
+            // コンテナのパディングを調整してリストを見やすくする
+            container.classList.remove('p-6');
+            container.classList.add('p-0'); 
+            
+            const officialSiteUrl = 'https://www.oneokrock.com/jp/';
+
+            container.innerHTML = `
+                <ul class="divide-y divide-gray-100">
+                    <li class="p-4 bg-primary text-white hover:bg-secondary transition duration-100 font-bold">
+                        <a href="${officialSiteUrl}" target="_blank" class="block">
+                            <p class="text-base">ONE OK ROCK 公式サイト（${officialSiteUrl.replace('https://', '').replace('/jp/', '')}）</p>
+                            <p class="text-sm opacity-90 mt-1">最新のライブ・チケット情報は公式サイトで必ずご確認ください。</p>
+                        </a>
+                    </li>
+                </ul>
+            `;
+        }
+
+        // --- 投稿の編集・削除機能 ---
+        
+        /**
+         * 削除確認モーダルを表示する
+         */
+        window.showDeleteConfirmModal = function(postId) {
+            postIdToDelete = postId;
+            document.getElementById('delete-confirm-modal').classList.remove('hidden');
+        }
+
+        /**
+         * 削除確認モーダルを非表示にする
+         */
+        window.hideDeleteConfirmModal = function() {
+            postIdToDelete = null;
+            document.getElementById('delete-confirm-modal').classList.add('hidden');
+        }
+        
+        /**
+         * 投稿をデータベースから削除する（カスタムモーダル経由）
+         */
+        window.deletePost = function(postId) { 
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+            window.showDeleteConfirmModal(postId); // カスタムモーダルを表示
+        }
+        
+        /**
+         * 削除の確定処理
+         */
+        async function confirmedDeletePost() {
+            if (!postIdToDelete || !isAuthReady) {
+                showMessage("削除する投稿が見つからないか、認証されていません。", true);
+                window.hideDeleteConfirmModal();
+                return;
+            }
+
+            const postRef = doc(db, PUBLIC_COLLECTION_PATH, postIdToDelete);
+            try {
+                // 親ドキュメントを削除
+                await deleteDoc(postRef);
+                showMessage("投稿を削除しました。");
+                
+                // 投稿削除後、投稿数を更新
+                await getUserPostCount(); 
+            } catch (error) {
+                console.error("投稿削除エラー:", error);
+                showMessage("投稿の削除に失敗しました。", true);
+            } finally {
+                window.hideDeleteConfirmModal(); // 処理後、モーダルを隠す
+            }
+        }
+
+        /**
+         * 編集モーダルを表示し、データをセットする
+         */
+        window.showEditModal = function(postId) {
+            const post = allPosts.find(p => p.id === postId);
+            if (!post) {
+                showMessage("編集する投稿が見つかりませんでした。", true);
+                return;
+            }
+            
+            // 認証されていないか、投稿者でない場合はエラー
+            if (!isAuthReady || post.userId !== userId) {
+                 showMessage("この投稿を編集する権限がありません。", true);
+                 return;
+            }
+            
+            // モーダルにデータを設定
+            document.getElementById('edit-post-id').value = postId;
+            document.getElementById('edit-title').value = post.title;
+            document.getElementById('edit-content').value = post.content;
+
+            // モーダルを表示
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        /**
+         * 編集モーダルを非表示にする
+         */
+        window.hideEditModal = function() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            // フォームをリセット
+            document.getElementById('edit-form').reset();
+        }
+
+        /**
+         * 編集した投稿内容を保存する
+         */
+        async function savePostEdit(e) {
+            e.preventDefault();
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+
+            const postId = document.getElementById('edit-post-id').value;
+            const newTitle = document.getElementById('edit-title').value.trim();
+            const newContent = document.getElementById('edit-content').value.trim();
+            
+            if (!newTitle || !newContent) {
+                showMessage("タイトルと内容を両方入力してください。", true);
+                return;
+            }
+
+            const postRef = doc(db, PUBLIC_COLLECTION_PATH, postId);
+            
+            try {
+                await updateDoc(postRef, {
+                    title: newTitle,
+                    content: newContent,
+                    editedAt: serverTimestamp() 
+                });
+
+                showMessage("投稿を更新しました！");
+                window.hideEditModal();
+            } catch (error) {
+                console.error("投稿編集エラー:", error);
+                showMessage("投稿の編集に失敗しました。", true);
+            }
+        }
+
+        // --- リアクション（いいね）機能 ---
+
+        window.toggleLike = async function(postId, currentlyLiked) {
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+            
+            const postRef = doc(db, PUBLIC_COLLECTION_PATH, postId);
+            
+            try {
+                // Firestore側でlikedBy配列の更新
+                if (currentlyLiked) {
+                    // いいねを解除するロジック (likesのデクリメントのみ実行)
+                    await updateDoc(postRef, {
+                        likes: increment(-1),
+                    });
+                } else {
+                    // いいねを追加するロジック
+                    await updateDoc(postRef, {
+                        likes: increment(1),
+                        // ユーザーIDを配列に追加
+                        likedBy: arrayUnion(userId)
+                    });
+                    showMessage("ハートを贈りました！");
+                }
+            } catch (error) {
+                console.error("いいねエラー:", error);
+                showMessage("リアクションの更新に失敗しました。", true);
+            }
+        }
+
+        // --- コメント機能 ---
+
+        function handleCommentSubmit(e) {
+            e.preventDefault();
+            if (!isAuthReady) {
+                showMessage("認証が完了していません。", true);
+                return;
+            }
+
+            const form = e.target;
+            const postId = form.getAttribute('data-post-id');
+            const parentId = form.getAttribute('data-parent-id') || null; // 親コメントID
+            const input = form.querySelector('.comment-input');
+            const commentText = input.value.trim();
+
+            if (!commentText) return;
+
+            try {
+                const commentsCollectionRef = collection(db, PUBLIC_COLLECTION_PATH, postId, 'comments');
+                addDoc(commentsCollectionRef, {
+                    text: commentText,
+                    userId: userId,
+                    userName: currentNickname, // ニックネームを保存
+                    parentId: parentId, // 親コメントIDを保存
+                    timestamp: serverTimestamp()
+                });
+                
+                // コメント送信後、フォームをリセットし、返信フォームを隠す
+                input.value = '';
+                if (parentId) {
+                    const replyFormContainer = document.getElementById(`reply-form-container-${parentId}`);
+                    if (replyFormContainer) replyFormContainer.innerHTML = ''; 
+                }
+                showMessage("コメントを投稿しました。");
+            } catch (error) {
+                console.error("コメント投稿エラー:", error);
+                showMessage("コメントの投稿に失敗しました。", true);
+            }
+        }
+        
+        /**
+         * コメント返信フォームの表示/非表示を切り替える (グローバル関数として定義)
+         */
+        window.toggleReplyForm = function(postId, parentId, parentAuthorName) {
+            const containerId = `reply-form-container-${parentId}`;
+            const container = document.getElementById(containerId);
+
+            if (!container) return;
+            
+            // 既にフォームが表示されている場合は非表示にする
+            if (container.innerHTML !== '') {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = `
+                <form class="comment-form flex mt-2 ml-4 md:ml-6" data-post-id="${postId}" data-parent-id="${parentId}">
+                    <input type="text" placeholder="${parentAuthorName}さんへ返信..." class="comment-input w-full p-2 border border-gray-300 rounded-l-lg text-sm focus:ring-primary focus:border-primary" required maxlength="500">
+                    <button type="submit" class="bg-primary hover:bg-secondary text-white text-sm font-bold px-4 py-2 rounded-r-lg transition duration-150">
+                        返信
+                    </button>
+                </form>
+            `;
+            
+            // 新しく作成したフォームにイベントリスナーを設定
+            container.querySelector('.comment-form').addEventListener('submit', handleCommentSubmit);
+            container.querySelector('.comment-input').focus();
+        }
+
+        function setupCommentListener(postId) {
+            const commentsList = document.getElementById(`comments-list-${postId}`);
+            const commentCountSpan = document.getElementById(`comment-count-${postId}`);
+            if (!commentsList) return;
+
+            const commentsQuery = query(collection(db, PUBLIC_COLLECTION_PATH, postId, 'comments'), orderBy('timestamp', 'asc'));
+
+            onSnapshot(commentsQuery, (snapshot) => {
+                
+                const commentsData = [];
+                snapshot.forEach(doc => {
+                    commentsData.push({ id: doc.id, ...doc.data() });
+                });
+
+                commentCountSpan.textContent = commentsData.length;
+                
+                // コメントを階層化
+                const topLevelComments = commentsData.filter(c => !c.parentId);
+                const nestedComments = {};
+                commentsData.forEach(c => {
+                    if (c.parentId) {
+                        if (!nestedComments[c.parentId]) {
+                            nestedComments[c.parentId] = [];
+                        }
+                        nestedComments[c.parentId].push(c);
+                    }
+                });
+                
+                commentsList.innerHTML = '';
+
+                // トップレベルコメントと返信を描画
+                topLevelComments.forEach(comment => {
+                    const commentElement = createCommentElement(comment, postId);
+                    commentsList.appendChild(commentElement);
+                    
+                    const replies = nestedComments[comment.id] || [];
+                    replies.forEach(reply => {
+                        const replyElement = createCommentElement(reply, postId, true); // trueでインデント
+                        commentsList.appendChild(replyElement);
+                    });
+                });
+
+            }, (error) => {
+                console.error(`コメント取得エラー (Post ID: ${postId}):`, error);
+                commentsList.innerHTML = `<p class="text-xs text-red-400">コメントの読み込みエラー。</p>`;
+            });
+        }
+
+        // コメント要素のDOM構築
+        function createCommentElement(comment, postId, isReply = false) {
+            const commentDiv = document.createElement('div');
+            const commentUserName = comment.userName || "名無しOORer";
+            const commentId = comment.id;
+            
+            // 返信コメントの場合はインデントを適用
+            commentDiv.className = `p-3 rounded-lg border border-gray-200 ${isReply ? 'ml-4 md:ml-8 bg-gray-100' : 'bg-gray-50'}`;
+            
+            commentDiv.innerHTML = `
+                <p class="text-sm text-gray-800 break-words">${comment.text}</p>
+                <div class="text-xs text-gray-500 mt-1 flex justify-between items-center">
+                    <!-- ニックネームをクリックで絞り込み -->
+                    <span class="cursor-pointer hover:underline text-gray-600 font-medium" onclick="filterByUser('${comment.userId}', '${commentUserName}')">
+                        ${commentUserName}
+                    </span>
+                    <div class="flex items-center space-x-2">
+                         <span>${formatTimestamp(comment.timestamp)}</span>
+                         <!-- 返信ボタン (トップレベル/子コメント両方につける) -->
+                         <button onclick="toggleReplyForm('${postId}', '${commentId}', '${commentUserName}')" 
+                                 class="text-blue-500 hover:text-blue-700 font-semibold transition duration-150 ml-2">
+                             返信
+                         </button>
+                    </div>
+                </div>
+                <!-- 返信フォームコンテナ (このコメントに対する返信フォームがここに表示される) -->
+                <div id="reply-form-container-${commentId}"></div>
+            `;
+            return commentDiv;
+        }
+
+        // アプリケーション起動
+        window.onload = initializeFirebase;
+        checkTermsAgreement();
+
+    </script>
 </body>
 </html>
+
+
