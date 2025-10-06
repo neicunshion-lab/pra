@@ -201,7 +201,7 @@
             <div id="quiz-area" class="mb-6 border border-gray-300 rounded-lg p-4 bg-gray-50">
                 <h3 class="text-lg font-bold mb-3 text-primary">ONE OK ROCK クイズ大会！</h3>
                 
-                <!-- ★追加: ルームID管理UI ★ -->
+                <!-- ルームID管理UI -->
                 <div class="mb-4 p-3 bg-white rounded-lg border flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                     <label for="room-id-input" class="text-sm font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">ルームID:</label>
                     <input type="text" id="room-id-input" value="one_ok_rock_quiz" placeholder="新しいルームIDを入力" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-primary focus:border-primary" maxlength="20">
@@ -209,7 +209,7 @@
                         切替/作成
                     </button>
                 </div>
-                <!-- ★追加ここまで ★ -->
+                <p class="text-xs text-gray-500 mb-2">現在のルーム: <strong id="current-room-display" class="text-gray-700">one_ok_rock_quiz</strong></p>
                 
                 <!-- プレイヤースロット -->
                 <p class="text-sm font-semibold mb-2 text-gray-700">参加者 (<span id="player-count">0</span>/4):</p>
@@ -330,11 +330,14 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, orderBy, limit, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, increment, setLogLevel, deleteDoc, arrayUnion, getDoc, setDoc, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, orderBy, limit, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, increment, setLogLevel, deleteDoc, arrayUnion, arrayRemove, getDoc, setDoc, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase設定のグローバル変数を使用
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        
+        // ★修正: 設定が空文字の場合にJSON.parseを試みないように安全なチェックを追加
+        const firebaseConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : {};
+        
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         let app;
@@ -594,7 +597,7 @@
 
             // 新しいルームIDを設定
             currentQuizId = newId;
-            input.value = newId; // UI表示を念のため更新
+            // input.value = newId; // UI表示はリスナー内で更新
 
             // リスナーを設定し直して、新しいルームに参加
             setupQuizListener(); 
@@ -670,8 +673,7 @@
                         return;
                     }
 
-                    // 最後のプレイヤーが退出した場合、ドキュメントを削除してリセット（ロビー状態のみ）
-                    // active中でもプレイヤーが0になれば削除
+                    // 最後のプレイヤーが退出した場合、ドキュメントを削除してリセット
                     if (Object.keys(players).length === 0) {
                         transaction.delete(quizRef);
                     } else {
@@ -888,6 +890,10 @@
             }
 
             quizListener = onSnapshot(quizRef, (doc) => {
+                // UIに現在のルームIDを反映
+                document.getElementById('current-room-display').textContent = currentQuizId;
+                document.getElementById('room-id-input').value = currentQuizId;
+
                 if (doc.exists()) {
                     quizState = doc.data();
                     renderQuizUI(quizState);
@@ -1054,6 +1060,10 @@
                 console.error("ニックネーム取得エラー:", error);
             }
             updateUserInfoDisplay();
+            // ★修正ポイント2: ニックネームが確定したら、クイズルームに参加し直す
+            if (isAuthReady) {
+                joinQuizRoom(); 
+            }
         }
 
         async function saveNickname(e) {
@@ -1219,6 +1229,11 @@
             try {
                 // setLogLevel('debug');
 
+                // ★修正1: firebaseConfigが空の場合は初期化しない
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase設定が不足しています。");
+                }
+
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -1239,8 +1254,10 @@
 
                     isAuthReady = true; // 認証完了
                     
-                    // 認証完了後にニックネームと投稿数をロード
+                    // 認証完了後にニックネームをロード (クイズルーム参加のため、データロードより前に実行)
                     await fetchNickname();
+                    
+                    // 投稿数を更新
                     await getUserPostCount(); 
                     
                     if (localStorage.getItem('termsAgreed') === 'true') {
@@ -1251,7 +1268,7 @@
 
             } catch (error) {
                 console.error("Firebaseの初期化中にエラーが発生しました:", error);
-                showMessage("初期化エラーが発生しました。コンソールを確認してください。", true);
+                showMessage(`初期化エラーが発生しました: ${error.message}`, true);
             }
         }
 
@@ -1784,10 +1801,12 @@
             try {
                 // Firestore側でlikedBy配列の更新
                 if (currentlyLiked) {
-                    // いいねを解除するロジック (likesのデクリメントのみ実行)
+                    // いいねを解除するロジック
                     await updateDoc(postRef, {
                         likes: increment(-1),
+                        likedBy: arrayRemove(userId) // ★修正: arrayRemoveでユーザーIDを削除
                     });
+                    showMessage("ハートを取り消しました。", false); 
                 } else {
                     // いいねを追加するロジック
                     await updateDoc(postRef, {
